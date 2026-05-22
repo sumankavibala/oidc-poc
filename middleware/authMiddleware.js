@@ -15,7 +15,6 @@ const authMiddleware = (req, res, next) => {
     req.role = decodedToken.role;
     next();
   } catch (error) {
-    console.log(error);
     return res.status(401).json({message: "Token is not valid"});
   }
 }

@@ -5,17 +5,25 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import AuthorizationCode from '../models/AuthorizationCode.js';
 import authMiddleware from '../middleware/authMiddleware.js';
+import OAuthClient from '../models/OAuthClient.js';
 
 const router = express.Router();
 
-router.post('/authorize', authMiddleware, async(req, res)=>{
+router.get('/authorize', async(req, res)=>{
   try {
+    const {client_id, redirect_uri} = req.query;
+    const client = await OAuthClient.findOne({clientId: client_id});
+    if(!client){
+      return res.status(404).json({message: "Client not found"});
+    }
+    if(!client.redirectUris.includes(redirect_uri)){
+      return res.status(400).json({message: "Invalid redirect URI"});
+    }
     const code = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await AuthorizationCode.create({code, userId: req.userId, expiresAt});
-    res.status(201).json({code, message: "Authorization code generated"});
-  ``} catch (error) {
-    console.log('error inside authorization route-->',error)
+    res.redirect(`${redirect_uri}?code=${code}`);
+  } catch (error) {
     res.status(500).json({message: error.message});
   }
 });
@@ -23,7 +31,6 @@ router.post('/authorize', authMiddleware, async(req, res)=>{
 router.post('/token', async(req, res)=>{
   try {
     const {code} = req.body;
-    console.log('code-->',code);
     if(!code){
       return res.status(400).json({message: "Authorization code is required"});
     }
@@ -43,7 +50,6 @@ router.post('/token', async(req, res)=>{
     await AuthorizationCode.deleteOne({code});
     res.json({message: "Token generated successfully", accessToken, refreshToken});
   } catch (error) {
-    console.log('error-->',error)
     res.status(500).json({message: "Internal server error"});
   }
 });
@@ -62,11 +68,9 @@ router.post('/register', async(req, res)=>{
 });
 
 router.post('/login',async(req, res)=> {
-  console.log('asdfg')
   try {
     const {email, password} = req.body;
     const user = await User.findOne({email});
-    console.log('user-->>',user);
     if(!user){
       return res.status(404).json({message: "User not found"});
     }
@@ -79,7 +83,6 @@ router.post('/login',async(req, res)=> {
     const refreshToken = jwt.sign({id: user._id, role: user.role}, process.env.REFRESH_SECRET, {expiresIn: "7d"}, {jwtid: crypto.randomUUID()});
     res.json({message: "User logged in successfully", token, refreshToken});
   } catch (error) {
-    console.log('error-->',error)
     res.status(500).json({message: "Internal server error"});
   }
 })
@@ -99,7 +102,6 @@ router.post('/refresh', async(req, res)=> {
     const newRefreshToken = jwt.sign({id: user._id, role: user.role}, process.env.REFRESH_SECRET, {expiresIn: "7d"}, {jwtid: crypto.randomUUID()});
     res.json({message: "Token refreshed successfully", token: newToken, refreshToken: newRefreshToken});
   } catch (error) {
-    console.log('error-->',error)
     return res.status(500).json({message: "Token is not valid"});
   }
 })
