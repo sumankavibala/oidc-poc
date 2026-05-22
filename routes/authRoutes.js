@@ -9,9 +9,9 @@ import OAuthClient from '../models/OAuthClient.js';
 
 const router = express.Router();
 
-router.get('/authorize', async(req, res)=>{
+router.get('/authorize',authMiddleware, async(req, res)=>{
   try {
-    const {client_id, redirect_uri} = req.query;
+    const {client_id, redirect_uri, scope} = req.query;
     const client = await OAuthClient.findOne({clientId: client_id});
     if(!client){
       return res.status(404).json({message: "Client not found"});
@@ -21,7 +21,7 @@ router.get('/authorize', async(req, res)=>{
     }
     const code = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await AuthorizationCode.create({code, userId: req.userId, expiresAt});
+    await AuthorizationCode.create({code, userId: req.userId, scope, expiresAt});
     res.redirect(`${redirect_uri}?code=${code}`);
   } catch (error) {
     res.status(500).json({message: error.message});
@@ -30,7 +30,7 @@ router.get('/authorize', async(req, res)=>{
 
 router.post('/token', async(req, res)=>{
   try {
-    const {code} = req.body;
+    const {code, client_id, client_secret} = req.body;
     if(!code){
       return res.status(400).json({message: "Authorization code is required"});
     }
@@ -41,14 +41,25 @@ router.post('/token', async(req, res)=>{
     if(authorizationCode.expiresAt < new Date()){
       return res.status(400).json({message: "Authorization code expired"});
     }
+    const client = await OAuthClient.findOne({clientId: client_id});
+    if(!client){
+      return res.status(404).json({message: "Client not found"});
+    }
+    if(client.clientSecret !== client_secret){
+      return res.status(401).json({message: "Invalid client secret"});
+    }
     const user = await User.findById(authorizationCode.userId);
     if(!user){
       return res.status(404).json({message: "User not found"});
     }
-    const accessToken = jwt.sign({id: user._id, role: user.role}, process.env.JWT_SECRET, {expiresIn: "15m"});
-    const refreshToken = jwt.sign({id: user._id, role: user.role}, process.env.REFRESH_SECRET, {expiresIn: "7d"});
+    const accessToken = jwt.sign({id: user._id, role: user.role, scope: authorizationCode.scope}, process.env.JWT_SECRET, {expiresIn: "15m"});
+    const refreshToken = jwt.sign({id: user._id, role: user.role, scope: authorizationCode.scope}, process.env.REFRESH_SECRET, {expiresIn: "7d"});
+    let idToken = null;
+    if(authorizationCode.scope.split(" ").includes("openid")){
+      idToken = jwt.sign({sub: user._id, role: user.role, scope: authorizationCode.scope}, process.env.JWT_SECRET, {expiresIn: "15m"});
+    }
     await AuthorizationCode.deleteOne({code});
-    res.json({message: "Token generated successfully", accessToken, refreshToken});
+    res.json({message: "Token generated successfully", accessToken, refreshToken, idToken});
   } catch (error) {
     res.status(500).json({message: "Internal server error"});
   }
