@@ -117,4 +117,20 @@ router.post('/refresh', async(req, res)=> {
   }
 })
 
+router.get('/userinfo',authMiddleware, async(req, res)=> {
+  try {
+    const user = await User.findById(req.userId);
+    if(!user){
+      return res.status(404).json({message: "User not found"});
+    }
+    res.json({
+      sub: user._id,
+      email: user.email,
+      role: user.role,
+    });
+  } catch (error) {
+    return res.status(500).json({message: error.message});
+  }
+});
+
 export default router;
