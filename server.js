@@ -5,6 +5,8 @@ import authRoutes from './routes/authRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import oauthRoutes from './routes/authClient.js';
 import dbConnection from './config/db.js';
+import discoveryRoutes from "./routes/discoveryRoutes.js";
+import jwksRoutes from "./routes/jwksRoutes.js";
 
 dotenv.config();
 
@@ -15,7 +17,9 @@ app.use(express.json());
 
 app.use('/auth',authRoutes);
 app.use('/api',profileRoutes);
-app.use('/oauth',oauthRoutes)
+app.use('/oauth',oauthRoutes);
+app.use('/.well-known',discoveryRoutes);
+app.use('/.well-known',jwksRoutes);
 app.get('/', (req, res) => {
     res.send('OIDC server is running');
 });

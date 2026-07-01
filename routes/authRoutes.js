@@ -6,12 +6,22 @@ import crypto from 'crypto';
 import AuthorizationCode from '../models/AuthorizationCode.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import OAuthClient from '../models/OAuthClient.js';
+import { privateKey } from '../config/key.js';
 
 const router = express.Router();
 
-router.get('/authorize',authMiddleware, async(req, res)=>{
+router.get('/authorize', async(req, res)=>{
   try {
-    const {client_id, redirect_uri, scope} = req.query;
+    const {client_id, redirect_uri, scope, token} = req.query;
+    let userId = req.userId;
+    if (!userId && token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        userId = decoded.id;
+      } catch (err) {
+        return res.status(401).json({message: "Invalid token provided in authorize request"});
+      }
+    }
     const client = await OAuthClient.findOne({clientId: client_id});
     if(!client){
       return res.status(404).json({message: "Client not found"});
@@ -21,7 +31,7 @@ router.get('/authorize',authMiddleware, async(req, res)=>{
     }
     const code = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await AuthorizationCode.create({code, userId: req.userId, scope, expiresAt});
+    await AuthorizationCode.create({code, userId: userId, scope, expiresAt});
     res.redirect(`${redirect_uri}?code=${code}`);
   } catch (error) {
     res.status(500).json({message: error.message});
@@ -55,8 +65,18 @@ router.post('/token', async(req, res)=>{
     const accessToken = jwt.sign({id: user._id, role: user.role, scope: authorizationCode.scope}, process.env.JWT_SECRET, {expiresIn: "15m"});
     const refreshToken = jwt.sign({id: user._id, role: user.role, scope: authorizationCode.scope}, process.env.REFRESH_SECRET, {expiresIn: "7d"});
     let idToken = null;
-    if(authorizationCode.scope.split(" ").includes("openid")){
-      idToken = jwt.sign({sub: user._id, role: user.role, scope: authorizationCode.scope}, process.env.JWT_SECRET, {expiresIn: "15m"});
+    if (authorizationCode.scope.split(" ").includes("openid")) {
+      idToken = jwt.sign(
+        { sub: user._id, role: user.role, scope: authorizationCode.scope },
+        privateKey,
+        {
+          expiresIn: "15m",
+          algorithm: "RS256",
+          header: {
+            kid: "key-1",
+          },
+        },
+      );
     }
     await AuthorizationCode.deleteOne({code});
     res.json({message: "Token generated successfully", accessToken, refreshToken, idToken});
@@ -68,9 +88,13 @@ router.post('/token', async(req, res)=>{
 router.post('/register', async(req, res)=>{
   try {
     const {email, password, role} = req.body;
+    const user = await User.findOne({email});
+    if(user){
+      return res.status(400).json({message: "User already exists"});
+    }
     const hashedPassword = await bcrypt.hash(password, 10);
-    await User.create({email, password: hashedPassword, role: role});
-    res.status(201).json({message: "User registered successfully"});
+    const userData = await User.create({email, password: hashedPassword, role: role});
+    res.status(201).json({message: "User registered successfully", ok: true, userData});
   } catch (error) {
     res.status(500).json({
       error: error.message

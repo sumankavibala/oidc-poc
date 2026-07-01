@@ -14,10 +14,10 @@ router.get('/client', async(req, res)=> {
 
 router.post('/addClient', async(req, res)=> {
   try {
-    const {clientId, name} = req.body;
+    const {clientId, clientSecret, name, redirectUris} = req.body;
     // const client = new OAuthClient({clientId, name});
     // await client.save();
-    const client = await OAuthClient.create({clientId, name});
+    const client = await OAuthClient.create({clientId, clientSecret, name, redirectUris});
     res.json(client);
   } catch (error) {
     res.status(500).json({message: "Internal server error"});
