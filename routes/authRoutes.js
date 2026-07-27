@@ -7,12 +7,28 @@ import AuthorizationCode from '../models/AuthorizationCode.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import OAuthClient from '../models/OAuthClient.js';
 import { privateKey } from '../config/key.js';
+import { createCodeChallenge } from '../utils/pkce.js';
 
 const router = express.Router();
 
 router.get('/authorize', async(req, res)=>{
   try {
-    const {client_id, redirect_uri, scope, token} = req.query;
+    const {client_id, redirect_uri, scope, token, code_challenge, code_challenge_method } = req.query;
+    if (!code_challenge) {
+      return res.status(400).json({
+          error: "code_challenge is required"
+      });
+    }
+    if (!code_challenge_method) {
+      return res.status(400).json({
+          error: "code_challenge_method is required"
+      });
+    }
+    if (code_challenge_method !== "S256") {
+      return res.status(400).json({
+          error: "Unsupported code_challenge_method"
+      });
+    }
     let userId = req.userId;
     if (!userId && token) {
       try {
@@ -31,7 +47,7 @@ router.get('/authorize', async(req, res)=>{
     }
     const code = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await AuthorizationCode.create({code, userId: userId, scope, expiresAt});
+    await AuthorizationCode.create({code, userId: userId, scope, expiresAt, codeChallenge: code_challenge, codeChallengeMethod: code_challenge_method});
     res.redirect(`${redirect_uri}?code=${code}`);
   } catch (error) {
     res.status(500).json({message: error.message});
@@ -40,7 +56,7 @@ router.get('/authorize', async(req, res)=>{
 
 router.post('/token', async(req, res)=>{
   try {
-    const {code, client_id, client_secret} = req.body;
+    const {code, client_id, client_secret, code_verifier} = req.body;
     if(!code){
       return res.status(400).json({message: "Authorization code is required"});
     }
@@ -58,9 +74,21 @@ router.post('/token', async(req, res)=>{
     if(client.clientSecret !== client_secret){
       return res.status(401).json({message: "Invalid client secret"});
     }
+    if(!code_verifier) {
+      return res.status(400).json({message: "code_verifier is required"});
+    }
     const user = await User.findById(authorizationCode.userId);
     if(!user){
       return res.status(404).json({message: "User not found"});
+    }
+    const authCode = await AuthorizationCode.findOne({code});
+    if(!authCode){
+      return res.status(404).json({message: "Authorization code not found"});
+    }
+
+    const calculateChallenge = await createCodeChallenge(code_verifier);
+    if(calculateChallenge !== authCode.codeChallenge) {
+      return res.status(400).json({message: "Invalid code challenge"});
     }
     const accessToken = jwt.sign({id: user._id, role: user.role, scope: authorizationCode.scope}, process.env.JWT_SECRET, {expiresIn: "15m"});
     const refreshToken = jwt.sign({id: user._id, role: user.role, scope: authorizationCode.scope}, process.env.REFRESH_SECRET, {expiresIn: "7d"});

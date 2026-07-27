@@ -5,6 +5,8 @@ const authorizationCodeSchema = new mongoose.Schema({
   userId: String,
   scope: String,
   expiresAt: Date,
+  codeChallenge: String,
+  codeChallengeMethod: String,
 });
 
 export default mongoose.model(
