@@ -30,7 +30,7 @@ jobs:
       - name: Analyze Efficiency via Google AI Studio Gemini
         env: 
           FREE_AI_API_KEY: ${{ secrets.FREE_AI_API_KEY }}
-        run: node .github/scripts/ai_review.js
+        run: node .github/scripts/ai_review.cjs
 
       - name: Post PR Comment
         uses: peter-evans/create-or-update-comment@v4

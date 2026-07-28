@@ -81,7 +81,7 @@ async function main() {
 
     try {
         const reviewText = response.candidates[0].content.parts[0].text;
-        fs.writeFileSync('review.md', '### ⚡ AI Code Efficiency Report\n\n' + review_text, 'utf8');
+        fs.writeFileSync('review.md', '### ⚡ AI Code Efficiency Report\n\n' + reviewText, 'utf8');
     } catch (err) {
         console.error('Failed to parse API response:', err);
         fs.writeFileSync('review.md', '⚠️ **Failed to parse AI Review response.**', 'utf8');
