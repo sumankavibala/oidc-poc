@@ -28,7 +28,7 @@ jobs:
           git fetch origin ${{ github.base_ref}}
           git diff origin/${{ github.base_ref }}...HEAD > pr_diff.txt
 
-      - name: Analyze Efficiency via Google AI Studio Gemini
+      - name: Analyze Efficiency via Groq API
         env: 
           FREE_AI_API_KEY: ${{ secrets.FREE_AI_API_KEY }}
         run: node .github/scripts/ai_review.cjs
