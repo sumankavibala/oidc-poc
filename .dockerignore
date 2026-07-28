@@ -1,0 +1,8 @@
+node_modules
+npm-debug.log
+.git
+.github
+.env
+pr_diff.txt
+review.md
+docker_build.log
