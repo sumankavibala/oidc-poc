@@ -34,7 +34,9 @@ async function main() {
         }
     };
 
-    const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite'];
+    // Most budget-friendly & highest free-tier quota models:
+    // gemini-1.5-flash-8b is the cheapest ($0.0375 / 1M tokens) & fastest model
+    const models = ['gemini-1.5-flash-8b', 'gemini-2.0-flash-lite', 'gemini-2.0-flash'];
     let response = null;
 
     for (const model of models) {
