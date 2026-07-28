@@ -7,6 +7,7 @@ on:
 permissions:
   pull-requests: write
   contents: read
+  packages: write
 
 jobs:
   review:
@@ -27,7 +28,7 @@ jobs:
           git fetch origin ${{ github.base_ref}}
           git diff origin/${{ github.base_ref }}...HEAD > pr_diff.txt
 
-      - name: Analyze Efficiency via Google AI Studio Gemini
+      - name: Analyze Efficiency via Groq API
         env: 
           FREE_AI_API_KEY: ${{ secrets.FREE_AI_API_KEY }}
         run: node .github/scripts/ai_review.cjs
@@ -46,6 +47,38 @@ jobs:
             echo '```' >> review.md
             exit 1
           fi
+
+      - name: Save Docker Image to File
+        run: |
+          docker save -o oidc-server.tar oidc-server:latest
+
+      - name: Upload Docker Image Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-oidc-server
+          path: oidc-server.tar
+          retention-days: 7
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Docker Image to GHCR
+        run: |
+          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/oidc-server
+          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+          VERSION=${{ github.sha }}
+          
+          docker tag oidc-server:latest $IMAGE_ID:$VERSION
+          docker tag oidc-server:latest $IMAGE_ID:latest
+          
+          docker push $IMAGE_ID:$VERSION
+          docker push $IMAGE_ID:latest
+          
+          echo -e "\n📦 **GHCR Package:** \`$IMAGE_ID:$VERSION\`" >> review.md
 
       - name: Post PR Comment
         if: always()
