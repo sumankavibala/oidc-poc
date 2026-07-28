@@ -1,0 +1,86 @@
+name: Free AI Code Efficiency Reviewer
+
+on: 
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install requests
+      
+      - name: Extract PR Diff
+        run: |
+          git fetch origin ${{ github.base_ref}}
+          git diff origin/${{ github.base_ref }}...HEAD > pr_diff.txt
+
+      - name: Analyze Efficiency via Groq Free API
+        env: 
+          Free_AI_API_KEY: ${{ secrets.Free_AI_API_KEY}}
+        run: |
+          python -c "
+          import os, requests, json
+
+          api_key = os.getenv('FREE_AI_API_KEY')
+          if not api_key:
+              print('Error: FREE_AI_API_KEY secret is missing!')
+              exit(1)
+
+          try:
+              with open('pr_diff.txt', 'r') as f:
+                  diff_content = f.read()[:12000] # Stay safely inside free token limits
+          except FileNotFoundError:
+              diff_content = 'No diff found.'
+
+          system_prompt = (
+              'You are an expert software engineer specializing in performance, efficiency, and resource optimization. '
+              'Analyze the following Git diff. Ignore style or syntax unless it hurts performance. '
+              'Focus entirely on finding algorithmic complexity bugs (Big O issues), heavy database/API loops, memory leaks, '
+              'or missing caching opportunities. Provide a highly concise markdown summary with concrete suggestions.'
+          )
+
+          headers = {
+              'Authorization': f'Bearer {api_key}',
+              'Content-Type': 'application/json'
+          }
+          
+          # Using Groq's fast, free llama-3.3-70b-versatile or llama3-70b-8192
+          payload = {
+              'model': 'llama-3.3-70b-specdec',
+              'messages': [
+                  {'role': 'system', 'content': system_prompt},
+                  {'role': 'user', 'content': f'Review this diff:\n\n{diff_content}'}
+              ],
+              'temperature': 0.2
+          }
+
+          response = requests.post('https://groq.com', headers=headers, json=payload)
+          
+          if response.status_code != 200:
+              print(f'API Error: {response.text}')
+              with open('review.md', 'w') as out:
+                  out.write(f'⚠️ AI Reviewer encountered an API error: {response.status_code}')
+              exit(0)
+
+          review_text = response.json()['choices'][0]['message']['content']
+          
+          with open('review.md', 'w') as out:
+              out.write('### ⚡ AI Code Efficiency Report\n\n' + review_text)
+          "
+          
