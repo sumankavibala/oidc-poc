@@ -32,7 +32,23 @@ jobs:
           FREE_AI_API_KEY: ${{ secrets.FREE_AI_API_KEY }}
         run: node .github/scripts/ai_review.cjs
 
+      - name: Build Application in Docker
+        run: |
+          echo -e "\n\n---\n" >> review.md
+          if docker build -t oidc-server:latest . > docker_build.log 2>&1; then
+            echo "### 🐳 Docker Build Status" >> review.md
+            echo "✅ **Success:** Application built successfully in Docker." >> review.md
+          else
+            echo "### 🐳 Docker Build Status" >> review.md
+            echo "❌ **Failed:** Docker build encountered errors:" >> review.md
+            echo '```' >> review.md
+            tail -n 30 docker_build.log >> review.md
+            echo '```' >> review.md
+            exit 1
+          fi
+
       - name: Post PR Comment
+        if: always()
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
