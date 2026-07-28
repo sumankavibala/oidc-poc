@@ -22,8 +22,8 @@ async function main() {
         'Focus entirely on finding algorithmic complexity bugs (Big O issues), heavy database/API loops, memory leaks, ' +
         'or missing caching opportunities. Provide a highly concise markdown summary with concrete suggestions.';
 
-    // Groq fast, free models
-    const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'];
+    // Most efficient, fastest & cheapest Groq model: llama-3.1-8b-instant (~800 tokens/sec)
+    const models = ['llama-3.1-8b-instant', 'llama3-8b-8192', 'llama-3.3-70b-versatile'];
     let response = null;
 
     const url = 'https://api.groq.com/openai/v1/chat/completions';
