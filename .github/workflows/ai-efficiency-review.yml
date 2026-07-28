@@ -30,7 +30,7 @@ jobs:
           git fetch origin ${{ github.base_ref}}
           git diff origin/${{ github.base_ref }}...HEAD > pr_diff.txt
 
-      - name: Analyze Efficiency via Groq Free API
+      - name: Analyze Efficiency via Google AI Studio Gemini
         env: 
           Free_AI_API_KEY: ${{ secrets.Free_AI_API_KEY}}
         run: |
@@ -56,31 +56,40 @@ jobs:
           )
 
           headers = {
-              'Authorization': f'Bearer {api_key}',
               'Content-Type': 'application/json'
           }
           
-          # Using Groq's fast, free llama-3.3-70b-versatile or llama3-70b-8192
+          url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}'
+
           payload = {
-              'model': 'llama-3.3-70b-specdec',
-              'messages': [
-                  {'role': 'system', 'content': system_prompt},
-                  {'role': 'user', 'content': f'Review this diff:\n\n{diff_content}'}
+              'system_instruction': {
+                  'parts': [{'text': system_prompt}]
+              },
+              'contents': [
+                  {'parts': [{'text': f'Review this diff:\n\n{diff_content}'}]}
               ],
-              'temperature': 0.2
+              'generationConfig': {
+                  'temperature': 0.2
+              }
           }
 
-          response = requests.post('https://groq.com', headers=headers, json=payload)
+          response = requests.post(url, headers=headers, json=payload)
           
           if response.status_code != 200:
               print(f'API Error: {response.text}')
               with open('review.md', 'w') as out:
-                  out.write(f'⚠️ AI Reviewer encountered an API error: {response.status_code}')
+                  out.write(f'⚠️ AI Reviewer encountered an API error: {response.status_code}\n\n```\n{response.text}\n```')
               exit(0)
 
-          review_text = response.json()['choices'][0]['message']['content']
+          review_text = response.json()['candidates'][0]['content']['parts'][0]['text']
           
           with open('review.md', 'w') as out:
               out.write('### ⚡ AI Code Efficiency Report\n\n' + review_text)
           "
+
+      - name: Post PR Comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: 'review.md'
           
