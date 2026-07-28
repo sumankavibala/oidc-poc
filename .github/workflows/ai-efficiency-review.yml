@@ -35,7 +35,7 @@ jobs:
           FREE_AI_API_KEY: ${{ secrets.FREE_AI_API_KEY }}
         run: |
           python -c "
-          import os, requests, json
+          import os, requests, json, time
 
           api_key = os.getenv('FREE_AI_API_KEY')
           if not api_key:
@@ -55,30 +55,36 @@ jobs:
               'or missing caching opportunities. Provide a highly concise markdown summary with concrete suggestions.'
           )
 
-          headers = {
-              'Content-Type': 'application/json'
-          }
-          
-          url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}'
-
+          headers = {'Content-Type': 'application/json'}
           payload = {
-              'system_instruction': {
-                  'parts': [{'text': system_prompt}]
-              },
-              'contents': [
-                  {'parts': [{'text': f'Review this diff:\n\n{diff_content}'}]}
-              ],
-              'generationConfig': {
-                  'temperature': 0.2
-              }
+              'system_instruction': {'parts': [{'text': system_prompt}]},
+              'contents': [{'parts': [{'text': f'Review this diff:\n\n{diff_content}'}]}],
+              'generationConfig': {'temperature': 0.2}
           }
 
-          response = requests.post(url, headers=headers, json=payload)
+          models = ['gemini-1.5-flash', 'gemini-2.0-flash-lite', 'gemini-2.0-flash']
+          response = None
           
-          if response.status_code != 200:
-              print(f'API Error: {response.text}')
+          for model in models:
+              url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}'
+              for attempt in range(3):
+                  print(f'Calling {model} (Attempt {attempt + 1})...')
+                  response = requests.post(url, headers=headers, json=payload)
+                  if response.status_code == 200:
+                      break
+                  elif response.status_code == 429:
+                      print(f'429 Rate limited on {model}, retrying in {(attempt + 1) * 5}s...')
+                      time.sleep((attempt + 1) * 5)
+                  else:
+                      break
+              if response and response.status_code == 200:
+                  break
+          
+          if not response or response.status_code != 200:
+              err_msg = response.text if response else 'No response'
+              print(f'API Error: {err_msg}')
               with open('review.md', 'w') as out:
-                  out.write(f'⚠️ AI Reviewer encountered an API error: {response.status_code}\n\n```\n{response.text}\n```')
+                  out.write(f'⚠️ AI Reviewer encountered an API error (Rate limit / Quota exceeded): {response.status_code if response else "Error"}\n\n```\n{err_msg}\n```\n\n*Tip: If using Google AI Studio Free Tier, wait 1 minute for rate limits to reset.*')
               exit(0)
 
           review_text = response.json()['candidates'][0]['content']['parts'][0]['text']
