@@ -103,3 +103,4 @@ jobs:
           docker push $IMAGE_ID:latest
           
           echo "Successfully pushed $IMAGE_ID:$VERSION and $IMAGE_ID:latest to GHCR."
+          
