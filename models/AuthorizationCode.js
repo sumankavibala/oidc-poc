@@ -7,6 +7,7 @@ const authorizationCodeSchema = new mongoose.Schema({
   expiresAt: Date,
   codeChallenge: String,
   codeChallengeMethod: String,
+  nonce: String,
 });
 
 export default mongoose.model(

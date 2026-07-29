@@ -13,7 +13,7 @@ const router = express.Router();
 
 router.get('/authorize', async(req, res)=>{
   try {
-    const {client_id, redirect_uri, scope, token, code_challenge, code_challenge_method } = req.query;
+    const {client_id, redirect_uri, scope, token, code_challenge, code_challenge_method, nonce } = req.query;
     if (!code_challenge) {
       return res.status(400).json({
           error: "code_challenge is required"
@@ -27,6 +27,11 @@ router.get('/authorize', async(req, res)=>{
     if (code_challenge_method !== "S256") {
       return res.status(400).json({
           error: "Unsupported code_challenge_method"
+      });
+    }
+    if (!nonce) {
+      return res.status(400).json({
+        error: "nonce is required"
       });
     }
     let userId = req.userId;
@@ -47,7 +52,7 @@ router.get('/authorize', async(req, res)=>{
     }
     const code = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await AuthorizationCode.create({code, userId: userId, scope, expiresAt, codeChallenge: code_challenge, codeChallengeMethod: code_challenge_method});
+    await AuthorizationCode.create({code, userId: userId, scope, expiresAt, codeChallenge: code_challenge, codeChallengeMethod: code_challenge_method, nonce: nonce });
     res.redirect(`${redirect_uri}?code=${code}`);
   } catch (error) {
     res.status(500).json({message: error.message});
@@ -95,7 +100,7 @@ router.post('/token', async(req, res)=>{
     let idToken = null;
     if (authorizationCode.scope.split(" ").includes("openid")) {
       idToken = jwt.sign(
-        { sub: user._id, role: user.role, scope: authorizationCode.scope },
+        { sub: user._id, role: user.role, scope: authorizationCode.scope, nonce: authorizationCode.nonce },
         privateKey,
         {
           expiresIn: "15m",
