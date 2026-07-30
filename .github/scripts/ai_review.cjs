@@ -4,7 +4,8 @@ async function main() {
     const apiKey = process.env.FREE_AI_API_KEY;
     if (!apiKey) {
         console.error('Error: FREE_AI_API_KEY secret is missing!');
-        process.exit(1);
+        fs.writeFileSync('review.md', '⚠️ **AI Review skipped:** `FREE_AI_API_KEY` repository secret is not set in GitHub Settings.', 'utf8');
+        process.exit(0);
     }
 
     let diffContent = 'No diff found.';

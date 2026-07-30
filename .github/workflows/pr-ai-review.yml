@@ -20,7 +20,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+
+      - name: Initialize Review File
+        run: |
+          echo "### 🔍 Pull Request Analysis" > review.md
 
       - name: Extract PR Diff
         run: |
@@ -59,7 +63,7 @@ jobs:
           retention-days: 7
 
       - name: Post PR Comment
-        if: always()
+        if: always() && hashFiles('review.md') != ''
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
