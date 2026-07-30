@@ -15,6 +15,7 @@ const router = express.Router();
 router.get('/authorize', async(req, res)=>{
   try {
     const {client_id, redirect_uri, scope, token, code_challenge, code_challenge_method, nonce } = req.query;
+    console.log('redirect_uri from request query-->>',redirect_uri);
     if (!code_challenge) {
       return res.status(400).json({
           error: "code_challenge is required"
@@ -48,6 +49,7 @@ router.get('/authorize', async(req, res)=>{
     if(!client){
       return res.status(404).json({message: "Client not found"});
     }
+    console.log('client.redirect_uri-->>',redirect_uri)
     if(!client.redirectUris || !client.redirectUris.includes(redirect_uri)){
       return res.status(400).json({message: "Invalid redirect URI"});
     }
