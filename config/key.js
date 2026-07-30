@@ -6,8 +6,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // 1. Load public.pem from committed keys folder or fallback
-const publicKeyPath = path.join(__dirname, '../keys/public.pem');
-const publicKey = fs.existsSync(publicKeyPath) ? fs.readFileSync(publicKeyPath, 'utf-8') : '';
+const publicKeyPath = path.resolve(__dirname, '../keys/public.pem');
+// Safely read public key if it exists, otherwise fall back to empty string
+let publicKey = '';
+if (fs.existsSync(publicKeyPath)) {
+  publicKey = fs.readFileSync(publicKeyPath, 'utf-8');
+}
 
 // 2. Load private.pem strictly from Render's secret stores
 const loadPrivateKey = () => {
