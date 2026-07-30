@@ -1,11 +1,11 @@
 import express from "express";
-import OAuthClient from "../models/OAuthClient.js";
+import { getOAuthClientsCollection } from "../models/OAuthClient.js";
 
 const router = express.Router();
 
 router.get('/client', async(req, res)=> {
   try {
-    const clients = await OAuthClient.find();
+    const clients = await getOAuthClientsCollection().find().toArray();
     res.json(clients);
   } catch (error) {
     res.status(500).json({message: "Internal server error"});
@@ -15,10 +15,9 @@ router.get('/client', async(req, res)=> {
 router.post('/addClient', async(req, res)=> {
   try {
     const {clientId, clientSecret, name, redirectUris} = req.body;
-    // const client = new OAuthClient({clientId, name});
-    // await client.save();
-    const client = await OAuthClient.create({clientId, clientSecret, name, redirectUris});
-    res.json(client);
+    const clientData = {clientId, clientSecret, name, redirectUris};
+    const result = await getOAuthClientsCollection().insertOne(clientData);
+    res.json({ _id: result.insertedId, ...clientData });
   } catch (error) {
     res.status(500).json({message: "Internal server error"});
   }

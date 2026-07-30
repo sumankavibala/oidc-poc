@@ -1,10 +1,3 @@
-import mongoose from "mongoose";
+import { getDb } from "../config/db.js";
 
-const oauthClientSchema = new mongoose.Schema({
-  clientId: String,
-  clientSecret: String,
-  name: String,
-  redirectUris: [String],
-});
-
-export default mongoose.model("OAuthClient", oauthClientSchema);
+export const getOAuthClientsCollection = () => getDb().collection("oauth_clients");
