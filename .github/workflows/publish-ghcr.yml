@@ -29,9 +29,37 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/oidc-poc:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/oidc-poc:${{ github.sha }}
 
-      - name: Trigger Render Deployment & Wait for Completion
-        uses: johnbeynon/render-deploy-action@v1.6.0
-        with:
-          service-id: ${{ secrets.RENDER_SERVICE_ID }}
-          api-key: ${{ secrets.RENDER_API_KEY }}
-          wait-for-success: true
+      - name: Trigger Render Deploy & Wait
+        run: |
+          # Trigger deployment via deploy hook
+          response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          if [ "$http_code" -ne 200 ] && [ "$http_code" -ne 201 ]; then
+            echo "Failed to trigger deploy. HTTP Status: $http_code"
+            echo "Response: $body"
+            exit 1
+          fi
+          
+          deploy_id=$(echo "$body" | grep -o '"id":"[^"]*' | head -n1 | cut -d'"' -f4)
+          echo "Deploy triggered successfully. Deploy ID: $deploy_id"
+          
+          # Poll deploy status using Render API until it succeeds or fails
+          if [ -n "$deploy_id" ] && [ -n "${{ secrets.RENDER_API_KEY }}" ]; then
+            echo "Waiting for deployment to complete..."
+            while true; do
+              sleep 10
+              status_res=$(curl -s -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+                "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys/$deploy_id")
+              status=$(echo "$status_res" | grep -o '"status":"[^"]*' | head -n1 | cut -d'"' -f4)
+              echo "Current status: $status"
+              if [ "$status" = "live" ]; then
+                echo "Deployment succeeded!"
+                break
+              elif [ "$status" = "build_failed" ] || [ "$status" = "update_failed" ] || [ "$status" = "canceled" ]; then
+                echo "Deployment failed with status: $status"
+                exit 1
+              fi
+            done
+          fi
