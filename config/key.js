@@ -9,27 +9,30 @@ const __dirname = path.dirname(__filename);
 const publicKeyPath = path.join(__dirname, '../keys/public.pem');
 const publicKey = fs.existsSync(publicKeyPath) ? fs.readFileSync(publicKeyPath, 'utf-8') : '';
 
-// 2. Load private.pem strictly from Render's secret stores (ENV or Render Secret Files)
+// 2. Load private.pem strictly from Render's secret stores
 const loadPrivateKey = () => {
+  // Check environment variable first
   if (process.env.PRIVATE_KEY) {
     return process.env.PRIVATE_KEY.replace(/\\n/g, '\n');
   }
 
+  // Define paths to search
   const renderSecretPaths = [
-    path.join('/etc/secrets', 'private.pem'),
-    path.join(process.cwd(), 'keys', 'private.pem'),
-    path.join(process.cwd(), 'private.pem'),
-    path.join(__dirname, '../keys', 'private.pem'),
+    '/etc/secrets/private.pem',                      // Render standard secret path
+    path.join(process.cwd(), 'private.pem'),         // Render native runtime mirror root
+    path.join(__dirname, '../keys/private.pem'),     // Local development fallback
   ];
 
+  // Loop through and return the first one that exists
   for (const keyPath of renderSecretPaths) {
     if (fs.existsSync(keyPath)) {
       return fs.readFileSync(keyPath, 'utf-8');
     }
   }
 
+  // Crash explicitly with a helpful message instead of letting readFileSync fail downstream
   throw new Error(
-    `Private key not found! Please configure PRIVATE_KEY environment variable or upload private.pem as a Secret File in Render.`
+    `Private key not found! Verified paths: ${renderSecretPaths.join(', ')}. Please configure PRIVATE_KEY or upload private.pem to Render Secrets.`
   );
 };
 
