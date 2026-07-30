@@ -1,16 +1,3 @@
-import mongoose from "mongoose";
+import { getDb } from "../config/db.js";
 
-const authorizationCodeSchema = new mongoose.Schema({
-  code: String,
-  userId: String,
-  scope: String,
-  expiresAt: Date,
-  codeChallenge: String,
-  codeChallengeMethod: String,
-  nonce: String,
-});
-
-export default mongoose.model(
-  "AuthorizationCode",
-  authorizationCodeSchema
-);
+export const getAuthorizationCodesCollection = () => getDb().collection("authorization_codes");
