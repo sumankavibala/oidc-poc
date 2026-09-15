@@ -28,13 +28,20 @@ jobs:
           no-cache: true
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/oidc-poc:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/oidc-poc:${{ github.sha }}
 
       - name: Trigger Render Deploy & Wait
         run: |
-          # Trigger deployment via deploy hook
-          response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+          # Append specific commit hash ref to deploy hook URL
+          HOOK_URL="${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+          if [[ "$HOOK_URL" == *'?'* ]]; then
+            HOOK_URL="${HOOK_URL}&ref=${{ github.sha }}"
+          else
+            HOOK_URL="${HOOK_URL}?ref=${{ github.sha }}"
+          fi
+
+          echo "Triggering deploy for commit SHA: ${{ github.sha }}"
+          response=$(curl -s -w "\n%{http_code}" -X POST "$HOOK_URL")
           http_code=$(echo "$response" | tail -n1)
           body=$(echo "$response" | sed '$d')
           
